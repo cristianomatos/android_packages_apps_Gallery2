@@ -153,17 +153,15 @@ public class PanoramaModule implements CameraModule,
     private float mHorizontalViewAngle;
     private float mVerticalViewAngle;
 
-    // Prefer FOCUS_MODE_INFINITY to FOCUS_MODE_CONTINUOUS_VIDEO because of
-    // getting a better image quality by the former.
-    private String mTargetFocusMode = Parameters.FOCUS_MODE_INFINITY;
+    private String mTargetFocusMode;
 
     private PanoOrientationEventListener mOrientationEventListener;
+
     // The value could be 0, 90, 180, 270 for the 4 different orientations measured in clockwise
     // respectively.
     private int mDeviceOrientation;
     private int mDeviceOrientationAtCapture;
     private int mCameraOrientation;
-    private int mPanoAngle;
     private int mOrientationCompensation;
 
     private RotateDialogController mRotateDialog;
@@ -364,6 +362,11 @@ public class PanoramaModule implements CameraModule,
         mCameraDevice = Util.openCamera(mActivity, cameraId);
         mCameraOrientation = Util.getCameraOrientation(cameraId);
         if (cameraId == CameraHolder.instance().getFrontCameraId()) mUsingFrontCamera = true;
+        if (mActivity.getResources().getBoolean(R.bool.useInfinityFocus)) {
+            mTargetFocusMode = Parameters.FOCUS_MODE_INFINITY;
+        } else {
+            mTargetFocusMode = Parameters.FOCUS_MODE_CONTINUOUS_VIDEO;
+        }
     }
 
     private boolean findBestPreviewSize(List<Size> supportedSizes, boolean need4To3,
@@ -653,9 +656,7 @@ public class PanoramaModule implements CameraModule,
                 (Math.abs(mProgressAngle[0]) > Math.abs(mProgressAngle[1]))
                 ? (int) mProgressAngle[0]
                 : (int) mProgressAngle[1];
-        //need to flip the direction if mPanoAngle is larger than 180
-        mPanoProgressBar.setProgress(mPanoAngle >= 180 ?
-            (0 - angleInMajorDirection) : angleInMajorDirection);
+        mPanoProgressBar.setProgress((angleInMajorDirection));
     }
 
     private void setViews(Resources appRes) {
@@ -790,9 +791,9 @@ public class PanoramaModule implements CameraModule,
         if (mUsingFrontCamera) {
             // mCameraOrientation is negative with respect to the front facing camera.
             // See document of android.hardware.Camera.Parameters.setRotation.
-            orientation = (mDeviceOrientationAtCapture - mCameraOrientation - mPanoAngle + 360) % 360;
+            orientation = (mDeviceOrientationAtCapture - mCameraOrientation + 360) % 360;
         } else {
-            orientation = (mDeviceOrientationAtCapture + mCameraOrientation - mPanoAngle) % 360;
+            orientation = (mDeviceOrientationAtCapture + mCameraOrientation) % 360;
         }
         return orientation;
     }
@@ -1161,12 +1162,7 @@ public class PanoramaModule implements CameraModule,
             // Set the display orientation to 0, so that the underlying mosaic
             // library can always get undistorted mPreviewWidth x mPreviewHeight
             // image data from SurfaceTexture.
-
-            // as Panoroma will add 90 degree rotation compensation during
-            // postprocessing, we need to consider both camera mount angle and
-            // this compensation angle
-            mPanoAngle = (mCameraOrientation - 90 + 360) % 360;
-            mCameraDevice.setDisplayOrientation(mPanoAngle);
+            mCameraDevice.setDisplayOrientation(0);
 
             if (mCameraTexture != null) mCameraTexture.setOnFrameAvailableListener(this);
             mCameraDevice.setPreviewTextureAsync(mCameraTexture);
